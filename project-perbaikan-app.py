@@ -108,17 +108,35 @@ def send_to_apps_script(values):
 
     url, token = load_apps_script_config()
     if not url:
-        return False, "URL Apps Script belum diisi di apps_script_config.json"
+        return False, "URL Apps Script belum diisi (apps_script_config.json / Secrets)"
 
     payload = {"token": token, "values": values}
+
+    def _post():
+        return requests.post(url, json=payload, timeout=120)
+
+    # Warm-up doGet dulu (Apps Script lambat saat cold start — bisa >30s)
     try:
-        resp = requests.post(url, json=payload, timeout=30)
+        requests.get(url, timeout=30)
+    except Exception:
+        pass  # warm-up gagal bukan masalah fatal
+
+    try:
+        resp = _post()
         data = resp.json()
         if data.get("ok"):
             return True, f"Tersimpan ke sheet baris {data.get('row', '?')}"
         return False, data.get("error", f"HTTP {resp.status_code}")
     except Exception as e:
-        return False, f"Gagal hubungi Apps Script: {e}"
+        # Retry sekali — seringnya timeout karena cold start, coba kedua lebih cepat
+        try:
+            resp = _post()
+            data = resp.json()
+            if data.get("ok"):
+                return True, f"Tersimpan ke sheet baris {data.get('row', '?')}"
+            return False, data.get("error", f"HTTP {resp.status_code}")
+        except Exception as e2:
+            return False, f"Gagal hubungi Apps Script: {e2}"
 
 
 def main():
