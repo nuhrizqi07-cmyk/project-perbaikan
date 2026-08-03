@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Data lokal (jangan di-commit ke repo — ephemeral & berisi data)
+data_perbaikan.csv
+data_perbaikan.xlsx
+
+# Kredensial (JANGAN pernah commit!)
+service_account.json
+*.pem
+*.key
+
+# Apps Script config (token di dalamnya — pakai Streamlit Secrets di cloud)
+apps_script_config.json
+
+# OS
+.DS_Store
+Thumbs.db
