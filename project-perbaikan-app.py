@@ -70,7 +70,7 @@ COLUMNS = {
     "P": 16, "Q": 17, "R": 18,
 }
 
-st.set_page_config(page_title="📋 Project Perbaikan — Isi Otomatis",
+st.set_page_config(page_title="Parser Surat Perbaikan",
                    page_icon="📋", layout="wide")
 
 
@@ -140,8 +140,8 @@ def send_to_apps_script(values):
 
 
 def main():
-    st.title("📋 Project Perbaikan — Isi Otomatis dari PDF")
-    st.caption("Upload PDF Surat Persetujuan Kepala Kantor → kolom D–M & O–R terisi otomatis")
+    st.title("Parser Surat Perbaikan")
+    st.caption("Upload PDF Surat Persetujuan Kepala Kantor Spreadsheet terisi Otomatis")
 
     # ── Sidebar: Download data tersimpan ──
     with st.sidebar:
