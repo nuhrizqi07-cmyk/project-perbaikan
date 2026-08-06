@@ -41,6 +41,11 @@ def _extract_common_fields(text):
     if not m:
         m = re.search(r'Hal\s*\n?\s*:\s*\n?\s*.+\s(PT\.?\s*.+)', text)
     result["perusahaan"] = m.group(1).strip() if m else ""
+    # Cleanup: hapus prefix "PT.", "PT ", lalu Title Case
+    result["perusahaan"] = re.sub(r'^(PT\.?|CV\.?|PD\.?)\s+', '',
+                                   result["perusahaan"], flags=re.IGNORECASE).strip()
+    # Title Case (kapital di awal kata)
+    result["perusahaan"] = " ".join(w.strip().title() for w in result["perusahaan"].split() if w.strip())
 
     # K: Kode Dokumen
     m = re.search(r'Jenis Dokumen TPB\s*\n?\s*:\s*\n?\s*BC\s*([\d.]+)', text)
