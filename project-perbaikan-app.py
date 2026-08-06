@@ -177,9 +177,32 @@ def main():
     # ── Parse ──
     with st.spinner("Membaca PDF..."):
         text = extract_pdf(uploaded)
-        parsed = parse_surat(text)
+        parsed_list = parse_surat(text)
 
-    st.success("✅ PDF terbaca. Cek hasil parsing di bawah, perbaiki kalau perlu.")
+    is_multi = len(parsed_list) > 1
+    st.success(f"✅ PDF terbaca — {len(parsed_list)} aju ditemukan"
+               + (" (multi-aju)" if is_multi else ""))
+
+    # ── Pick which aju to display/edit ──
+    if is_multi:
+        # Tampilkan tabel ringkasan, user bisa pilih aju untuk edit
+        st.subheader(f"📋 Daftar {len(parsed_list)} Aju")
+        preview = []
+        for i, p in enumerate(parsed_list):
+            preview.append({
+                "#": i + 1,
+                "No Aju": p["nomor_aju"],
+                "Nopen": p["nopen"],
+                "Status": p["status"],
+                "Item": p["item_perbaikan"][:60] + ("..." if len(p.get("item_perbaikan","")) > 60 else ""),
+            })
+        st.dataframe(preview, use_container_width=True, hide_index=True)
+        st.caption("Semua aju akan disimpan jadi baris terpisah di Google Sheet.")
+        selected_idx = 0  # default: edit aju pertama
+        st.divider()
+
+    # Pilih data untuk ditampilkan di form
+    parsed = parsed_list[0] if is_multi else parsed_list[0]
 
     # ── Form: kolom yang diisi otomatis (D–M, O–R) ──
     st.subheader("📝 Data Terisi Otomatis")
@@ -260,30 +283,56 @@ def main():
             st.error("Isi dulu kolom B (Pegawai PDAD).")
             return
 
-        values = [
-            "",  # A No (dihitung otomatis)
+        # Build common values (cuma sekali)
+        common_base = [
             b_pegawai,
             "",  # C File
             d_surat,
             e_tgl_surat,
             f_hal,
             g_tgl_diterima.strftime("%d-%m-%Y"),
-            "",  # H Jenis (tidak diisi sesuai revisi)
+            "",  # H Jenis
             i_perusahaan,
-            j_nomor_aju,
-            "",  # K Kode Dokumen (tidak diisi sesuai revisi)
-            l_nopen,
-            m_tgl_daftar,
-            "",  # N Aplikasi (tidak diisi sesuai revisi)
+            "",  # K Kode Dokumen
+            "",  # N Aplikasi
             o_surat_perm,
             p_tgl_perm,
-            q_status,
-            r_item,
         ]
 
-        # Simpan lokal (default) — XLSX + CSV
-        xlsx_bytes = save_local(values)
-        st.success("✅ Baris tersimpan ke file lokal!")
+        # Loop semua aju yg mau disimpan
+        aju_list = parsed_list if is_multi else [{"nomor_aju": j_nomor_aju,
+            "nopen": l_nopen, "tanggal_daftar": m_tgl_daftar,
+            "status": q_status, "item_perbaikan": r_item,
+            "surat_permohonan": o_surat_perm, "tanggal_permohonan": p_tgl_perm}]
+
+        saved = 0
+        for i, aju in enumerate(aju_list):
+            values = [
+                "",  # A No (dihitung otomatis)
+                b_pegawai if i == 0 else b_pegawai,  # B
+                "",  # C File
+                d_surat,
+                e_tgl_surat,
+                f_hal,
+                g_tgl_diterima.strftime("%d-%m-%Y"),
+                "",  # H Jenis
+                i_perusahaan,
+                aju.get("nomor_aju", ""),
+                "",  # K Kode Dokumen
+                aju.get("nopen", ""),
+                aju.get("tanggal_daftar", ""),
+                "",  # N Aplikasi
+                aju.get("surat_permohonan", o_surat_perm),
+                aju.get("tanggal_permohonan", p_tgl_perm),
+                aju.get("status", q_status),
+                aju.get("item_perbaikan", r_item),
+            ]
+            save_local(values)
+            saved += 1
+
+        # Simpan lokal — XLSX + CSV
+        xlsx_bytes = build_xlsx_bytes(load_local_rows())
+        st.success(f"✅ {saved} baris tersimpan ke file lokal!")
 
         # Tombol download langsung
         st.download_button(
@@ -298,13 +347,26 @@ def main():
         url_gs, _ = load_apps_script_config()
         SPREADSHEET_URL = ("https://docs.google.com/spreadsheets/d/"
                            "1Jvi7Ek8LynDr5dHdc0GBahqpwiKKv_v4d1u3l7RPZWw/edit")
+        gs_saved = 0
         if url_gs:
-            ok, msg = send_to_apps_script(values)
-            if ok:
-                st.success(f"📤 Terkirim ke Google Sheet: {msg}")
+            for aju in aju_list:
+                vals = [
+                    "", b_pegawai, "", d_surat, e_tgl_surat, f_hal,
+                    g_tgl_diterima.strftime("%d-%m-%Y"), "", i_perusahaan,
+                    aju.get("nomor_aju", ""), "", aju.get("nopen", ""),
+                    aju.get("tanggal_daftar", ""), "",
+                    aju.get("surat_permohonan", o_surat_perm),
+                    aju.get("tanggal_permohonan", p_tgl_perm),
+                    aju.get("status", q_status),
+                    aju.get("item_perbaikan", r_item),
+                ]
+                ok, _ = send_to_apps_script(vals)
+                if ok: gs_saved += 1
+            if gs_saved:
+                st.success(f"📤 {gs_saved}/{len(aju_list)} baris terkirim ke Google Sheet")
                 st.markdown(f"🔗 [Buka Google Sheet]({SPREADSHEET_URL})")
-            else:
-                st.warning(f"⚠️ Gagal kirim ke Google Sheet: {msg}")
+            if gs_saved < len(aju_list):
+                st.warning(f"⚠️ {len(aju_list) - gs_saved} gagal kirim ke Google Sheet")
         elif os.path.exists(SERVICE_ACCOUNT):
             try:
                 append_row_gs(values)
