@@ -46,7 +46,7 @@ BALAS HANYA JSON array. Satu elemen = satu nomor aju. Tanpa markdown, tanpa penj
 ATURAN EKSTRAKSI:
 - "surat": hanya angka setelah "S-" (contoh: "1924" dari "S-1924/KBC.1102/2026")
 - "perusahaan": nama saja, HAPUS "PT.", "CV.", "PD." di depan, Title Case. Contoh: "Fronte Classic Indonesia"
-- "aju": format lengkap dengan tanda hubung (000023-010832-20260728-000115), dari "Nomor Pengajuan"
+- "aju": format TANPA tanda hubung, gabung semua. Contoh: "00002301083220260728000115" (dari "000023-010832-20260728-000115")
 - "nopen": angka saja dari "Nomor Pendaftaran", tanpa spasi
 - "tanggal_surat" / "tanggal_daftar" / "tanggal_permohonan": format asli dari surat (contoh: "10 Agustus 2026" atau "28-07-2026")
 - "item_perbaikan": nama kolom yang dibetulkan dari tabel Elemen Data, Title Case, dipisah koma. Contoh: "Nilai CIF, Uraian Barang, BM, BMT"

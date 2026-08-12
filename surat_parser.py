@@ -62,7 +62,7 @@ def _extract_ajo_block(text):
 
     # J: Nomor Aju
     m = re.search(r'Nomor Pengajuan\s*\n?\s*:\s*\n?\s*([0-9\-]+)', text)
-    result["nomor_aju"] = m.group(1).strip('-') if m else ""
+    result["nomor_aju"] = m.group(1).replace("-", "").replace("−", "").strip() if m else ""
 
     # L, M: Nomor Pendaftaran / Tanggal
     m = re.search(
