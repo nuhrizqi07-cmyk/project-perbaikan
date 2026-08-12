@@ -80,8 +80,8 @@ def _extract_ajo_block(text):
         else:
             result["tanggal_daftar"] = ""
 
-    # Q: Status Dokumen
-    m = re.search(r'Status Dokumen\s*\n?\s*:\s*\n?\s*(.+)', text)
+    # Q: Status Dokumen — cover 2 varian: "Status Dokumen : X" atau "Status pada CEISA 4.0 : X"
+    m = re.search(r'Status\s+(?:Dokumen|pada\s+CEISA\s*4\.0)\s*\\n?\s*:\s*\\n?\s*(.+)', text)
     result["status"] = m.group(1).strip() if m else ""
 
     # R: Item Perbaikan — ambil NAMA kolom dari tabel "Elemen data..."
@@ -190,6 +190,38 @@ def parse_surat(text):
             result["tanggal_permohonan"] = ""
 
         results.append(result)
+
+    # ── LLM Fallback: kalau regex nggak nemu aju sama sekali ──
+    # (format surat baru / luar biasa → pakai AI)
+    if not results or all(r.get("nomor_aju", "") == "" for r in results):
+        try:
+            from llm_parser import parse_with_llm
+            llm_results = parse_with_llm(text)
+            if llm_results:
+                normalized = []
+                for lr in llm_results:
+                    r = dict(common)
+                    # Field per-aju
+                    r["nomor_aju"] = lr.get("aju", "")
+                    r["nopen"] = str(lr.get("nopen", ""))
+                    r["tanggal_daftar"] = lr.get("tanggal_daftar", "")
+                    r["status"] = lr.get("status", "")
+                    r["item_perbaikan"] = lr.get("item_perbaikan", "")
+                    r["surat_permohonan"] = lr.get("surat_permohonan", "")
+                    r["tanggal_permohonan"] = lr.get("tanggal_permohonan", "")
+                    # Override common fields kalau LLM kasih nilai lebih baik
+                    if lr.get("surat"):
+                        r["surat"] = lr["surat"]
+                    if lr.get("tanggal_surat"):
+                        r["tanggal_surat"] = lr["tanggal_surat"]
+                    if lr.get("hal"):
+                        r["hal"] = lr["hal"]
+                    if lr.get("perusahaan"):
+                        r["perusahaan"] = lr["perusahaan"]
+                    normalized.append(r)
+                return normalized
+        except ImportError:
+            pass  # openai belum terinstall → skip LLM fallback
 
     return results
 
