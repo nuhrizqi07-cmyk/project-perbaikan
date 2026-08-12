@@ -10,7 +10,8 @@ import re
 DEEPSEEK_MODEL = "deepseek-chat"  # V3 — cepat, murah, akurat untuk ekstraksi
 
 def _get_api_key():
-    """Ambient: Streamlit Secrets → env → hardcoded (local dev)."""
+    """Ambil dari Streamlit Secrets (local: .streamlit/secrets.toml, cloud: Settings)
+       atau env var DEEPSEEK_API_KEY."""
     try:
         import streamlit as st
         key = st.secrets.get("DEEPSEEK_API_KEY", "")
@@ -18,11 +19,7 @@ def _get_api_key():
             return key
     except Exception:
         pass
-    key = os.environ.get("DEEPSEEK_API_KEY", "")
-    if key:
-        return key
-    # Fallback lokal (ganti atau override via env/Secrets)
-    return "sk-72ba6276b8184436bec2f86cf0701445"
+    return os.environ.get("DEEPSEEK_API_KEY", "")
 
 
 PROMPT_TEMPLATE = """Kamu asisten Bea Cukai yang mengekstrak data dari surat persetujuan pembetulan/pembatalan dokumen TPB.

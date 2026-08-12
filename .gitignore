@@ -16,6 +16,9 @@ service_account.json
 # Apps Script config (token di dalamnya — pakai Streamlit Secrets di cloud)
 apps_script_config.json
 
+# Streamlit local secrets (jangan commit!)
+.streamlit/secrets.toml
+
 # OS
 .DS_Store
 Thumbs.db
