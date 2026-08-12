@@ -191,9 +191,15 @@ def parse_surat(text):
 
         results.append(result)
 
-    # ── LLM Fallback: kalau regex nggak nemu aju sama sekali ──
-    # (format surat baru / luar biasa → pakai AI)
-    if not results or all(r.get("nomor_aju", "") == "" for r in results):
+    # ── LLM Fallback: kalau regex hasilnya jelek (aju kepotong / field kosong) ──
+    needs_llm = (
+        not results
+        or all(r.get("nomor_aju", "") == "" for r in results)
+        or any(len(r.get("nomor_aju", "")) < 18 for r in results)  # aju kepotong (BC 2.5: "000025")
+        or all(r.get("item_perbaikan", "") == "" for r in results)
+        or all(r.get("status", "") == "" for r in results)
+    )
+    if needs_llm:
         try:
             from llm_parser import parse_with_llm
             llm_results = parse_with_llm(text)

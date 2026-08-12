@@ -51,7 +51,7 @@ ATURAN EKSTRAKSI:
 - "tanggal_surat" / "tanggal_daftar" / "tanggal_permohonan": format asli dari surat (contoh: "10 Agustus 2026" atau "28-07-2026")
 - "item_perbaikan": nama kolom yang dibetulkan dari tabel Elemen Data, Title Case, dipisah koma. Contoh: "Nilai CIF, Uraian Barang, BM, BMT"
 - "aplikasi": "CEISA 4.0" atau "CEISA TPB", dari konteks surat
-- "status": dari "Status pada CEISA 4.0" atau "Status Dokumen", contoh: "Gate In TPB/KEK", "SPPD"
+- "status": dari "Status pada CEISA 4.0", "Status Dokumen", atau "Uraian Proses". Contoh: "Gate In TPB/KEK", "SPPD", "Selesai Proses"
 
 Teks surat:
 ---AWAL---
