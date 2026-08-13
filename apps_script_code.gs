@@ -43,6 +43,20 @@ function doPost(e) {
       sheet = ss.getSheets()[0];
     }
 
+    // Cek duplikat: kunci = Surat (D, kolom 4) + Nomor Aju (J, kolom 10)
+    // Satu nomor aju bisa dapat beberapa surat persetujuan, jadi aju saja TIDAK cukup.
+    var dupLast = sheet.getLastRow();
+    if (dupLast >= 2) {
+      var scan = sheet.getRange(2, 1, dupLast - 1, 10).getValues();
+      var key = String(values[3]) + "|" + String(values[9]);
+      for (var i = 0; i < scan.length; i++) {
+        if (String(scan[i][3]) + "|" + String(scan[i][9]) === key) {
+          return jsonReply({ ok: true, duplicate: true, row: i + 2,
+                             message: "Duplikat — sudah ada di baris " + (i + 2) });
+        }
+      }
+    }
+
     // Isi kolom A (No) otomatis = nilai maksimum kolom A + 1
     var lastRow = sheet.getLastRow();
     var no = 1;
