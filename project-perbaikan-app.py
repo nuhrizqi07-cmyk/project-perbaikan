@@ -63,6 +63,13 @@ def load_apps_script_config():
 # Kolom yang HARUS teks (biar gak jadi scientific notation di Excel)
 TEXT_COLUMNS = {4, 10, 12}  # D(4) Surat, J(10) Nomor Aju, L(12) Nopen
 
+
+def clean_aju(x):
+    """Normalisasi nomor aju: buang SEMUA varian tanda hubung (- − – — ‐)."""
+    if x is None:
+        return ""
+    return re.sub(r"[\-−–—‐]", "", str(x)).strip()
+
 # Mapping kolom: nama field → nomor kolom (1-based)
 COLUMNS = {
     "A": 1, "B": 2, "C": 3, "D": 4, "E": 5, "F": 6, "G": 7, "H": 8,
@@ -191,7 +198,7 @@ def main():
         for i, p in enumerate(parsed_list):
             preview.append({
                 "#": i + 1,
-                "No Aju": p["nomor_aju"],
+                "No Aju": clean_aju(p["nomor_aju"]),
                 "Nopen": p["nopen"],
                 "Status": p["status"],
                 "Item": p["item_perbaikan"][:60] + ("..." if len(p.get("item_perbaikan","")) > 60 else ""),
@@ -233,7 +240,7 @@ def main():
     # Row 3: Nomor Aju, Nopen, Tanggal Daftar
     c7, c8, c9 = st.columns(3)
     with c7:
-        j_nomor_aju = st.text_input("J. Nomor Aju", parsed["nomor_aju"])
+        j_nomor_aju = st.text_input("J. Nomor Aju", clean_aju(parsed["nomor_aju"]))
     with c8:
         l_nopen = st.text_input("L. Nopen", parsed["nopen"])
     with c9:
@@ -317,7 +324,7 @@ def main():
                 g_tgl_diterima.strftime("%d-%m-%Y"),
                 "",  # H Jenis
                 i_perusahaan,
-                aju.get("nomor_aju", ""),
+                clean_aju(aju.get("nomor_aju", "")),
                 "",  # K Kode Dokumen
                 aju.get("nopen", ""),
                 aju.get("tanggal_daftar", ""),
@@ -353,7 +360,7 @@ def main():
                 vals = [
                     "", b_pegawai, "", d_surat, e_tgl_surat, f_hal,
                     g_tgl_diterima.strftime("%d-%m-%Y"), "", i_perusahaan,
-                    aju.get("nomor_aju", ""), "", aju.get("nopen", ""),
+                    clean_aju(aju.get("nomor_aju", "")), "", aju.get("nopen", ""),
                     aju.get("tanggal_daftar", ""), "",
                     aju.get("surat_permohonan", o_surat_perm),
                     aju.get("tanggal_permohonan", p_tgl_perm),

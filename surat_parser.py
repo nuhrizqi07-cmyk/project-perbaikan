@@ -62,7 +62,7 @@ def _extract_ajo_block(text):
 
     # J: Nomor Aju
     m = re.search(r'Nomor Pengajuan\s*\n?\s*:\s*\n?\s*([0-9\-]+)', text)
-    result["nomor_aju"] = m.group(1).replace("-", "").replace("−", "").strip() if m else ""
+    result["nomor_aju"] = re.sub(r"[\-−–—‐]", "", m.group(1)).strip() if m else ""
 
     # L, M: Nomor Pendaftaran / Tanggal
     m = re.search(
@@ -208,7 +208,7 @@ def parse_surat(text):
                 for lr in llm_results:
                     r = dict(common)
                     # Field per-aju
-                    r["nomor_aju"] = lr.get("aju", "")
+                    r["nomor_aju"] = re.sub(r"[\-−–—‐]", "", str(lr.get("aju", "")))
                     r["nopen"] = str(lr.get("nopen", ""))
                     r["tanggal_daftar"] = lr.get("tanggal_daftar", "")
                     r["status"] = lr.get("status", "")

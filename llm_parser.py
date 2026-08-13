@@ -33,7 +33,7 @@ BALAS HANYA JSON array. Satu elemen = satu nomor aju. Tanpa markdown, tanpa penj
   "tanggal_surat": "10 Agustus 2026",
   "hal": "Persetujuan Pembetulan Data Dokumen TPB (BC 2.3)",
   "perusahaan": "Fronte Classic Indonesia",
-  "aju": "000023-010832-20260728-000115",
+  "aju": "00002301083220260728000115",
   "nopen": "006057",
   "tanggal_daftar": "28-07-2026",
   "aplikasi": "CEISA 4.0",
@@ -91,6 +91,12 @@ def parse_with_llm(text: str) -> list[dict]:
         data = json.loads(content)
         if isinstance(data, dict):
             data = [data]
+
+        # Normalisasi: nomor aju TANPA tanda hubung (semua varian dash)
+        for row in data:
+            for key in ("aju", "nomor_aju"):
+                if row.get(key):
+                    row[key] = re.sub(r"[\-−–—‐]", "", str(row[key]))
 
         return data
 
