@@ -71,6 +71,9 @@ function doPost(e) {
     }
     values[0] = no; // set No
 
+    // Nopen wajib 6 digit (tambah 0 di depan kalau kurang dari 6)
+    values[11] = String(values[11] || "").replace(/[^0-9]/g, "").padStart(6, "0");
+
     sheet.appendRow(values);
 
     return jsonReply({ ok: true, row: no, message: "Tersimpan ke baris " + no });
@@ -79,8 +82,37 @@ function doPost(e) {
   }
 }
 
-function doGet() {
+function doGet(e) {
+  var p = (e && e.parameter) ? e.parameter : {};
+  if (p.fix === "nopen") {
+    return jsonReply({ ok: true, fixed: fixNopen() });
+  }
   return jsonReply({ ok: true, message: "Project Perbaikan web app aktif" });
+}
+
+// Pad kolom L (Nopen) yang sudah ada menjadi 6 digit (panggil via ?fix=nopen)
+function fixNopen() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
+  var last = sheet.getLastRow();
+  if (last < 2) return 0;
+  var range = sheet.getRange(2, 12, last - 1, 1);
+  var vals = range.getValues();
+  var fixed = 0;
+  for (var i = 0; i < vals.length; i++) {
+    var raw = String(vals[i][0]).trim();
+    if (raw === "") continue;
+    var digits = raw.replace(/[^0-9]/g, "");
+    if (digits.length > 0 && digits.length < 6) {
+      vals[i][0] = digits.padStart(6, "0");
+      fixed++;
+    }
+  }
+  if (fixed > 0) {
+    range.setValues(vals);
+    range.setNumberFormat('@');
+  }
+  return fixed;
 }
 
 function jsonReply(obj) {

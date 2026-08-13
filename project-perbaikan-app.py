@@ -70,6 +70,17 @@ def clean_aju(x):
         return ""
     return re.sub(r"[\-−–—‐]", "", str(x)).strip()
 
+
+def pad_nopen(x):
+    """Normalisasi nopen: angka saja, wajib 6 digit (isi 0 di depan kalau kurang)."""
+    if x is None:
+        return ""
+    if isinstance(x, (int, float)):
+        digits = str(int(x))
+    else:
+        digits = re.sub(r"[^0-9]", "", str(x))
+    return digits.zfill(6) if digits else ""
+
 # Mapping kolom: nama field → nomor kolom (1-based)
 COLUMNS = {
     "A": 1, "B": 2, "C": 3, "D": 4, "E": 5, "F": 6, "G": 7, "H": 8,
@@ -242,7 +253,7 @@ def main():
     with c7:
         j_nomor_aju = st.text_input("J. Nomor Aju", clean_aju(parsed["nomor_aju"]))
     with c8:
-        l_nopen = st.text_input("L. Nopen", parsed["nopen"])
+        l_nopen = st.text_input("L. Nopen", pad_nopen(parsed["nopen"]))
     with c9:
         m_tgl_daftar = st.text_input("M. Tanggal Daftar", parsed["tanggal_daftar"])
 
@@ -326,7 +337,7 @@ def main():
                 i_perusahaan,
                 clean_aju(aju.get("nomor_aju", "")),
                 "",  # K Kode Dokumen
-                aju.get("nopen", ""),
+                pad_nopen(aju.get("nopen", "")),
                 aju.get("tanggal_daftar", ""),
                 "",  # N Aplikasi
                 aju.get("surat_permohonan", o_surat_perm),
