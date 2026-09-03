@@ -7,7 +7,7 @@ import os
 import re
 
 # ── Konfigurasi ──
-DEEPSEEK_MODEL = "deepseek-chat"  # V3 — cepat, murah, akurat untuk ekstraksi
+DEEPSEEK_MODEL = "deepseek-v4-flash"  # V4 Flash — cepat, murah, akurat untuk ekstraksi
 
 def _get_api_key():
     """Ambil dari Streamlit Secrets (local: .streamlit/secrets.toml, cloud: Settings)
