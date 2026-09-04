@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 """LLM-based parser for Surat Persetujuan — fallback when regex fails.
-Uses DeepSeek API (OpenAI-compatible endpoint)."""
+Uses OpenRouter API (OpenAI-compatible endpoint) → DeepSeek V4 Flash."""
 
 import json
 import os
 import re
 
 # ── Konfigurasi ──
-DEEPSEEK_MODEL = "deepseek-v4-flash"  # V4 Flash — cepat, murah, akurat untuk ekstraksi
+MODEL_ID = "deepseek/deepseek-v4-flash"  # OpenRouter: DeepSeek V4 Flash — cepat, murah, akurat
 
 def _get_api_key():
     """Ambil dari Streamlit Secrets (local: .streamlit/secrets.toml, cloud: Settings)
-       atau env var DEEPSEEK_API_KEY."""
+       atau env var OPENROUTER_API_KEY."""
     try:
         import streamlit as st
-        key = st.secrets.get("DEEPSEEK_API_KEY", "")
+        key = st.secrets.get("OPENROUTER_API_KEY", "")
         if key:
             return key
     except Exception:
         pass
-    return os.environ.get("DEEPSEEK_API_KEY", "")
+    return os.environ.get("OPENROUTER_API_KEY", "")
 
 
 PROMPT_TEMPLATE = """Kamu asisten Bea Cukai yang mengekstrak data dari surat persetujuan pembetulan/pembatalan dokumen TPB.
@@ -72,12 +72,16 @@ def parse_with_llm(text: str) -> list[dict]:
 
     client = openai.OpenAI(
         api_key=api_key,
-        base_url="https://api.deepseek.com",
+        base_url="https://openrouter.ai/api/v1",
+        default_headers={
+            "HTTP-Referer": "https://perbaikan.streamlit.app",
+            "X-Title": "project-perbaikan-parser",
+        },
     )
 
     try:
         resp = client.chat.completions.create(
-            model=DEEPSEEK_MODEL,
+            model=MODEL_ID,
             messages=[{"role": "user", "content": PROMPT_TEMPLATE.replace("{text}", text)}],
             temperature=0,
             max_tokens=3000,
