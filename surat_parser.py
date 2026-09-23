@@ -81,7 +81,8 @@ def _extract_ajo_block(text):
             result["tanggal_daftar"] = ""
 
     # Q: Status Dokumen — cover 2 varian: "Status Dokumen : X" atau "Status pada CEISA 4.0 : X"
-    m = re.search(r'Status\s+(?:Dokumen|pada\s+CEISA\s*4\.0)\s*\\n?\s*:\s*\\n?\s*(.+)', text)
+    # Catatan: harus \n? (bukan \\n?) supaya newline asli dikenali
+    m = re.search(r'Status\s+(?:Dokumen|pada\s+CEISA\s*4\.0)\s*\n?\s*:\s*\n?\s*(.+)', text)
     result["status"] = m.group(1).strip() if m else ""
 
     # R: Item Perbaikan — ambil NAMA kolom dari tabel "Elemen data..."
@@ -146,6 +147,66 @@ def _extract_zero_permohonan(text):
     return "", ""
 
 
+def _perlu_llm(results):
+    """True kalau hasil regex bolong/rusak → perlu ditambal pakai LLM."""
+    return (
+        not results
+        or all(r.get("nomor_aju", "") == "" for r in results)
+        or any(len(r.get("nomor_aju", "")) < 18 for r in results)   # aju kepotong (BC 2.5: "000025")
+        or all(r.get("nopen", "") == "" for r in results)
+        or all(r.get("tanggal_daftar", "") == "" for r in results)
+        or all(r.get("status", "") == "" for r in results)
+        or all(r.get("item_perbaikan", "") == "" for r in results)
+    )
+
+
+def _llm_fallback(text, common, base_results=None):
+    """Tambal hasil regex pakai LLM.
+    base_results = hasil regex (kalau ada). Nilai LLM hanya menimpa kalau TIDAK kosong,
+    supaya jawaban LLM yang tidak lengkap tidak menghapus hasil regex yang sudah benar.
+    Return list dict atau [] kalau LLM gagal/kosong."""
+    try:
+        from llm_parser import parse_with_llm
+    except ImportError:
+        return []  # openai belum terinstall → skip LLM fallback
+
+    llm_results = parse_with_llm(text)
+    if not llm_results:
+        return []
+
+    # field LLM -> field internal
+    MAPPING = (
+        ("nopen", "nopen"),
+        ("tanggal_daftar", "tanggal_daftar"),
+        ("status", "status"),
+        ("item_perbaikan", "item_perbaikan"),
+        ("surat_permohonan", "surat_permohonan"),
+        ("tanggal_permohonan", "tanggal_permohonan"),
+        ("surat", "surat"),
+        ("tanggal_surat", "tanggal_surat"),
+        ("hal", "hal"),
+        ("perusahaan", "perusahaan"),
+    )
+
+    normalized = []
+    for i, lr in enumerate(llm_results):
+        # mulai dari hasil regex kalau ada (biar nilai yang sudah benar tidak hilang)
+        if base_results and i < len(base_results):
+            r = dict(base_results[i])
+        else:
+            r = dict(common)
+
+        aju = re.sub(r"[\-−–—‐]", "", str(lr.get("aju", "")))
+        if aju:
+            r["nomor_aju"] = aju
+        for src, dst in MAPPING:
+            val = lr.get(src)
+            if val:
+                r[dst] = val
+        normalized.append(r)
+    return normalized
+
+
 def parse_surat(text):
     """Parse Surat Persetujuan → list of dicts, satu dict per aju.
     Kalau gak ada multi-aju, balikin list dgn 1 elemen (backward-compat)."""
@@ -165,6 +226,12 @@ def parse_surat(text):
         surat_oh, tgl_oh = _extract_zero_permohonan(text)
         result["surat_permohonan"] = surat_oh
         result["tanggal_permohonan"] = tgl_oh
+        # PENTING: dulu jalur ini langsung return tanpa cek LLM, sehingga aju/nopen/
+        # tanggal_daftar tetap kosong di surat yang labelnya bukan "Nomor Pengajuan".
+        if _perlu_llm([result]):
+            tambalan = _llm_fallback(text, common, [result])
+            if tambalan:
+                return tambalan
         return [result]
 
     # Multi-aju: ekstrak setiap blok
@@ -192,42 +259,10 @@ def parse_surat(text):
         results.append(result)
 
     # ── LLM Fallback: kalau regex hasilnya jelek (aju kepotong / field kosong) ──
-    needs_llm = (
-        not results
-        or all(r.get("nomor_aju", "") == "" for r in results)
-        or any(len(r.get("nomor_aju", "")) < 18 for r in results)  # aju kepotong (BC 2.5: "000025")
-        or all(r.get("item_perbaikan", "") == "" for r in results)
-        or all(r.get("status", "") == "" for r in results)
-    )
-    if needs_llm:
-        try:
-            from llm_parser import parse_with_llm
-            llm_results = parse_with_llm(text)
-            if llm_results:
-                normalized = []
-                for lr in llm_results:
-                    r = dict(common)
-                    # Field per-aju
-                    r["nomor_aju"] = re.sub(r"[\-−–—‐]", "", str(lr.get("aju", "")))
-                    r["nopen"] = str(lr.get("nopen", ""))
-                    r["tanggal_daftar"] = lr.get("tanggal_daftar", "")
-                    r["status"] = lr.get("status", "")
-                    r["item_perbaikan"] = lr.get("item_perbaikan", "")
-                    r["surat_permohonan"] = lr.get("surat_permohonan", "")
-                    r["tanggal_permohonan"] = lr.get("tanggal_permohonan", "")
-                    # Override common fields kalau LLM kasih nilai lebih baik
-                    if lr.get("surat"):
-                        r["surat"] = lr["surat"]
-                    if lr.get("tanggal_surat"):
-                        r["tanggal_surat"] = lr["tanggal_surat"]
-                    if lr.get("hal"):
-                        r["hal"] = lr["hal"]
-                    if lr.get("perusahaan"):
-                        r["perusahaan"] = lr["perusahaan"]
-                    normalized.append(r)
-                return normalized
-        except ImportError:
-            pass  # openai belum terinstall → skip LLM fallback
+    if _perlu_llm(results):
+        tambalan = _llm_fallback(text, common, results)
+        if tambalan:
+            return tambalan
 
     return results
 
