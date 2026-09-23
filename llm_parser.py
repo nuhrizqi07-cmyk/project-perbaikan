@@ -7,7 +7,7 @@ import os
 import re
 
 # ── Konfigurasi ──
-MODEL_ID = "deepseek/deepseek-v4-flash"  # OpenRouter: DeepSeek V4 Flash — cepat, murah, akurat
+MODEL_ID = "deepseek/deepseek-v4.1-flash"  # OpenRouter: DeepSeek V4.1 Flash — cepat, murah, akurat
 
 def _get_api_key():
     """Ambil dari Streamlit Secrets (local: .streamlit/secrets.toml, cloud: Settings)
@@ -84,9 +84,15 @@ def parse_with_llm(text: str) -> list[dict]:
             model=MODEL_ID,
             messages=[{"role": "user", "content": PROMPT_TEMPLATE.replace("{text}", text)}],
             temperature=0,
-            max_tokens=3000,
+            max_tokens=8000,  # V4.1 Flash = model reasoning: token "berpikir" ikut kena batas ini
         )
         content = resp.choices[0].message.content
+
+        if not content:
+            # Bisa terjadi kalau max_tokens habis dipakai token reasoning
+            print("[llm_parser] respon kosong (finish_reason="
+                  f"{resp.choices[0].finish_reason})")
+            return []
 
         # Bersihkan markdown wrapper (LLM kadang "bandel" bungkus JSON)
         content = re.sub(r"^```(?:json)?\s*", "", content.strip())
