@@ -39,7 +39,10 @@ def _extract_common_fields(text):
     # I: Perusahaan
     m = re.search(r'Yth\.\s*Pimpinan\s+(PT\.?\s*.+)', text)
     if not m:
-        m = re.search(r'Hal\s*\n?\s*:\s*\n?\s*.+\s(PT\.?\s*.+)', text)
+        # "Yth." tanpa "Pimpinan" — nama perusahaan di baris berikutnya
+        m = re.search(r'Yth\.?\s*\n\s*((?:PT|CV|PD)\.?\s*[^\n]+)', text)
+    if not m:
+        m = re.search(r'Hal\s*\n?\s*:\s*\n?\s*.+\s((?:PT|CV|PD)\.?\s*.+)', text)
     result["perusahaan"] = m.group(1).strip() if m else ""
     # Cleanup: hapus prefix "PT.", "PT ", lalu Title Case
     result["perusahaan"] = re.sub(r'^(PT\.?|CV\.?|PD\.?)\s+', '',
@@ -176,15 +179,18 @@ def _nama_kolom_dari_tabel(text):
 
 
 def _extract_zero_permohonan(text):
-    """Extract surat_permohonan & tanggal from '► Nomor Permohonan' marker."""
+    """Extract surat_permohonan & tanggal dari kalimat permohonan (kolom O & P)."""
+    # 1) penanda eksplisit: "Nomor Permohonan : X  Tanggal Y"
     m = re.search(
-        r'►?\s*Nomor\s*Permohonan\s*:\s*(\S+)\s*Tanggal\s*(\d{1,2}\s+\w+\s+\d{4})',
+        r'►?\s*Nomor\s*Permohonan\s*:?\s*(\S+)\s*Tanggal\s*:?\s*(\d{1,2}\s+\w+\s+\d{4})',
         text, re.IGNORECASE)
     if m:
         return m.group(1), re.sub(r'\s+', ' ', m.group(2)).strip()
-    # Fallback: "surat Saudara nomor X tanggal Y"
+    # 2) kalimat surat: "...surat Saudara/permohonan Nomor X tanggal Y..." (boleh beda baris)
     m = re.search(
-        r'surat Saudara\s+(?:Nomor|nomor)\s+(\S+)\s+tanggal\s+(\d{1,2}\s+\w+\s+\d{4})',
+        r'(?:surat\s+(?:saudara|permohonan)|permohonan\s+saudara)[^\n]{0,60}?'
+        r'(?:nomor|no\.?)\s*:?\s*\n?\s*([A-Za-z0-9][A-Za-z0-9\-/\.]*)\s*\n?\s*'
+        r'[^\n]{0,40}?tanggal\s*:?\s*\n?\s*(\d{1,2}\s+\w+\s+\d{4})',
         text, re.IGNORECASE)
     if m:
         return m.group(1), re.sub(r'\s+', ' ', m.group(2)).strip()
@@ -297,8 +303,11 @@ def parse_surat(text):
             result["surat_permohonan"] = last_perm.group(1)
             result["tanggal_permohonan"] = re.sub(r'\s+', ' ', last_perm.group(2)).strip()
         else:
-            result["surat_permohonan"] = ""
-            result["tanggal_permohonan"] = ""
+            # Cadangan: kalimat "Sehubungan dengan Surat Saudara nomor X tanggal Y"
+            # (sebelumnya jalur ini langsung diisi "" sehingga kolom O/P kosong)
+            surat_oh, tgl_oh = _extract_zero_permohonan(text)
+            result["surat_permohonan"] = surat_oh
+            result["tanggal_permohonan"] = tgl_oh
 
         results.append(result)
 
