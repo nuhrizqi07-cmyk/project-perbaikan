@@ -8,6 +8,10 @@ import re
 
 # ── Konfigurasi ──
 MODEL_ID = "deepseek/deepseek-v4.1-flash"  # OpenRouter: DeepSeek V4.1 Flash — cepat, murah, akurat
+# V4.1 Flash adalah model "reasoning" (selalu berpikir dulu sebelum menjawab).
+# effort "minimal" = paling cepat & paling murah; naikkan ke "low"/"medium" kalau akurasi kurang.
+REASONING_EFFORT = "minimal"
+MAX_TOKENS = 12000  # token reasoning + JSON ikut dihitung, jadi perlu lega
 
 def _get_api_key():
     """Ambil dari Streamlit Secrets (local: .streamlit/secrets.toml, cloud: Settings)
@@ -84,7 +88,8 @@ def parse_with_llm(text: str) -> list[dict]:
             model=MODEL_ID,
             messages=[{"role": "user", "content": PROMPT_TEMPLATE.replace("{text}", text)}],
             temperature=0,
-            max_tokens=8000,  # V4.1 Flash = model reasoning: token "berpikir" ikut kena batas ini
+            max_tokens=MAX_TOKENS,
+            extra_body={"reasoning": {"effort": REASONING_EFFORT}},
         )
         content = resp.choices[0].message.content
 
