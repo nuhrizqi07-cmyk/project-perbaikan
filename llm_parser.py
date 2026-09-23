@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """LLM-based parser for Surat Persetujuan — fallback when regex fails.
-Uses OpenRouter API (OpenAI-compatible endpoint) → DeepSeek V4 Flash."""
+Uses OpenRouter API (OpenAI-compatible endpoint) → openai/gpt-4.1-nano,
+model murah + cepat (diuji pada surat BC 2.7 asli: benar 7/7 field, ~3 detik)."""
 
 import json
 import os
 import re
 
 # ── Konfigurasi ──
-MODEL_ID = "deepseek/deepseek-v4.1-flash"  # OpenRouter: DeepSeek V4.1 Flash — cepat, murah, akurat
-# V4.1 Flash adalah model "reasoning" (selalu berpikir dulu sebelum menjawab).
-# effort "minimal" = paling cepat & paling murah; naikkan ke "low"/"medium" kalau akurasi kurang.
-REASONING_EFFORT = "minimal"
-MAX_TOKENS = 12000  # token reasoning + JSON ikut dihitung, jadi perlu lega
+# Model murah + cepat, sudah diuji pada surat asli BC 2.7 (Baramuda Bahari S-1493):
+#   openai/gpt-4.1-nano  -> benar 7/7 field, 2,9 detik, ~$0,00022 per surat
+# Kalau mau pindah model lagi, cukup ubah MODEL_ID / MAX_TOKENS di bawah.
+MODEL_ID = "openai/gpt-4.1-nano"
+REASONING_EFFORT = None  # GPT-4.1 Nano bukan model reasoning -> parameter ini TIDAK dikirim
+MAX_TOKENS = 16000       # batas maksimum GPT-4.1 Nano = 32768 token
 
 def _get_api_key():
     """Ambil dari Streamlit Secrets (local: .streamlit/secrets.toml, cloud: Settings)
@@ -83,43 +85,56 @@ def parse_with_llm(text: str) -> list[dict]:
         },
     )
 
-    try:
-        resp = client.chat.completions.create(
-            model=MODEL_ID,
-            messages=[{"role": "user", "content": PROMPT_TEMPLATE.replace("{text}", text)}],
-            temperature=0,
-            max_tokens=MAX_TOKENS,
-            extra_body={"reasoning": {"effort": REASONING_EFFORT}},
-        )
-        content = resp.choices[0].message.content
+    kwargs: dict = dict(
+        model=MODEL_ID,
+        messages=[{"role": "user", "content": PROMPT_TEMPLATE.replace("{text}", text)}],
+        temperature=0,
+        max_tokens=MAX_TOKENS,
+    )
+    if REASONING_EFFORT:
+        # hanya untuk model reasoning (DeepSeek V4.x) — Nova Lite tidak kenal parameter ini
+        kwargs["extra_body"] = {"reasoning": {"effort": REASONING_EFFORT}}
 
-        if not content:
-            # Bisa terjadi kalau max_tokens habis dipakai token reasoning
-            print("[llm_parser] respon kosong (finish_reason="
-                  f"{resp.choices[0].finish_reason})")
+    last_err = ""
+    # 2 percobaan: model murah kadang sekali balas non-JSON / kosong
+    for percobaan in range(2):
+        try:
+            resp = client.chat.completions.create(**kwargs)
+            content = resp.choices[0].message.content
+
+            if not content:
+                last_err = f"respon kosong (finish_reason={resp.choices[0].finish_reason})"
+                continue
+
+            # Bersihkan markdown wrapper (LLM kadang "bandel" bungkus JSON)
+            content = re.sub(r"^```(?:json)?\s*", "", content.strip())
+            content = re.sub(r"\s*```$", "", content.strip())
+            # Ambil array JSON saja kalau ada teks pembuka
+            if not content.startswith("["):
+                m = re.search(r"\[.*\]", content, re.DOTALL)
+                if m:
+                    content = m.group(0)
+
+            data = json.loads(content)
+            if isinstance(data, dict):
+                data = [data]
+
+            # Normalisasi: nomor aju TANPA tanda hubung (semua varian dash)
+            for row in data:
+                for key in ("aju", "nomor_aju"):
+                    if row.get(key):
+                        row[key] = re.sub(r"[\-−–—‐]", "", str(row[key]))
+
+            return data
+
+        except json.JSONDecodeError as e:
+            last_err = f"JSON tidak valid: {e}"
+        except Exception as e:
+            print(f"[llm_parser] API error: {e}")
             return []
 
-        # Bersihkan markdown wrapper (LLM kadang "bandel" bungkus JSON)
-        content = re.sub(r"^```(?:json)?\s*", "", content.strip())
-        content = re.sub(r"\s*```$", "", content.strip())
-
-        data = json.loads(content)
-        if isinstance(data, dict):
-            data = [data]
-
-        # Normalisasi: nomor aju TANPA tanda hubung (semua varian dash)
-        for row in data:
-            for key in ("aju", "nomor_aju"):
-                if row.get(key):
-                    row[key] = re.sub(r"[\-−–—‐]", "", str(row[key]))
-
-        return data
-
-    except json.JSONDecodeError:
-        return []
-    except Exception as e:
-        print(f"[llm_parser] API error: {e}")
-        return []
+    print(f"[llm_parser] gagal setelah 2 percobaan: {last_err}")
+    return []
 
 
 if __name__ == "__main__":
