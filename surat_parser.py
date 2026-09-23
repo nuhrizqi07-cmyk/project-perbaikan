@@ -127,8 +127,52 @@ def _extract_ajo_block(text):
     # Cleanup: hapus ", dan X." di ekor (sisa marker aju berikutnya)
     result["item_perbaikan"] = re.sub(r',?\s*dan\s+\d+\.?\s*$', '',
                                        result["item_perbaikan"])
+    # Cadangan: layout tabel yang tiap sel jadi baris sendiri (mis. BC 2.7)
+    if not result["item_perbaikan"]:
+        result["item_perbaikan"] = _nama_kolom_dari_tabel(text)
 
     return result
+
+
+def _nama_kolom_dari_tabel(text):
+    """Cara cadangan ambil nama kolom tabel pembetulan, untuk layout yang tiap sel-nya
+    jadi baris sendiri (mis. surat BC 2.7): buang baris angka/nilai, sisanya nama kolom.
+    Return string sudah Title Case, atau "" kalau tak ketemu."""
+    start = re.search(
+        r'(?:Elemen|Element)\s+[Dd]ata[^\n]*?(?:pembetulan|perubahan)[^\n]*:\s*\n', text)
+    if not start:
+        return ""
+    region = text[start.end():]
+    # batas akhir tabel: mulai butir bernomor / penutup surat
+    end = re.search(r'(?m)^\s*(?:\d+\.\s|Demikian|Plt\.|Ditandatangani|Dokumen ini telah)',
+                    region)
+    if end:
+        region = region[:end.start()]
+
+    header = {"no", "kolom", "diberitahukan", "seharusnya", "sebelumnya", "menjadi",
+              "terekam", "urut", "data", "no urut", "uraian"}
+    nama = []
+    for ln in (l.strip() for l in region.split("\n")):
+        if not ln or ln.lower() in header:
+            continue
+        # buang baris yang isinya nilai/angka saja
+        if re.fullmatch(r'[\d\.,\-\s]+', ln):
+            continue
+        if re.fullmatch(r'-?\d+\s*\(BC\s*[\d\.]+\)', ln, re.IGNORECASE):   # mis. "-4 (BC 2.7)"
+            continue
+        if re.search(r'\d{2}-\d{2}-\d{4}', ln):                            # tanggal
+            continue
+        nama.append(ln)
+
+    # gabung nama kolom yang kepotong beberapa baris (kurung belum ditutup)
+    gabung = []
+    for ln in nama:
+        if gabung and (gabung[-1].count("(") > gabung[-1].count(")")):
+            gabung[-1] = (gabung[-1] + " " + ln).strip()
+        else:
+            gabung.append(ln)
+
+    return _join_names(gabung)
 
 
 def _extract_zero_permohonan(text):

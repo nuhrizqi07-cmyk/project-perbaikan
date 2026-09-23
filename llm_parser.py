@@ -55,7 +55,15 @@ ATURAN EKSTRAKSI:
 - "aju": format TANPA tanda hubung, gabung semua. Contoh: "00002301083220260728000115" (dari "000023-010832-20260728-000115")
 - "nopen": angka saja dari "Nomor Pendaftaran", tanpa spasi
 - "tanggal_surat" / "tanggal_daftar" / "tanggal_permohonan": format asli dari surat (contoh: "10 Agustus 2026" atau "28-07-2026")
-- "item_perbaikan": nama kolom yang dibetulkan dari tabel Elemen Data, Title Case, dipisah koma. Contoh: "Nilai CIF, Uraian Barang, BM, BMT"
+- "item_perbaikan": HANYA NAMA kolom elemen data yang dibetulkan (dari tabel pembetulan), Title Case,
+  dipisah koma. JANGAN masukkan nilai sebelum/seharusnya, JANGAN masukkan angka nomor urut.
+  Cara cari tabelnya: cari baris judul tabel yang mengandung kata "Elemen/Element Data" (mis.
+  "Elemen data yang disetujui untuk dilakukan pembetulan" atau "Element Data yang dilakukan perubahan").
+  Setelah baris judul ada header kolom (mis. "No  KOLOM  Diberitahukan  Seharusnya").
+  Isi kolom KOLOM itulah yang diambil. Nama kolom bisa TERPOTONG jadi beberapa baris — gabungkan
+  dulu jadi satu nama utuh sebelum di-Title Case.
+  Contoh hasil: "Lembar Ke 3 (Lembar Dokumen Pelengkap Pabean), No Urut Dalam, Tanggal"
+  atau "Nilai CIF, Uraian Barang, BM, BMT"
 - "aplikasi": "CEISA 4.0" atau "CEISA TPB", dari konteks surat
 - "status": dari "Status pada CEISA 4.0", "Status Dokumen", atau "Uraian Proses". Contoh: "Gate In TPB/KEK", "SPPD", "Selesai Proses"
 
