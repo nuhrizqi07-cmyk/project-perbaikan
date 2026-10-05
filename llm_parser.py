@@ -50,6 +50,14 @@ BALAS HANYA JSON array. Satu elemen = satu nomor aju. Tanpa markdown, tanpa penj
 }]
 
 ATURAN EKSTRAKSI:
+- PENTING — angka sering TERPECAH jadi beberapa baris di PDF (satu sel = beberapa baris teks).
+  GABUNGKAN dulu jadi satu angka utuh, jangan berhenti di baris pertama.
+  Contoh nyata: No.AJU ditulis "071340006432" / "202607170010" / "37" →
+  aju = "07134000643220260717001037" (26 digit). Termasuk kalau nomornya dicetak
+  sebagian di baris berikutnya yang isinya cuma 1-2 digit.
+- Label bervariasi antar template: aju bisa berlabel "Nomor Pengajuan", "No.AJU", atau "AJU";
+  pendaftaran bisa berlabel "Nomor Pendaftaran / Tanggal" atau "No Pend / Tgl";
+  status bisa berlabel "Status pada CEISA 4.0", "Status Dokumen", "Status Dok", atau "Uraian Proses".
 - "surat": hanya angka setelah "S-" (contoh: "1924" dari "S-1924/KBC.1102/2026")
 - "perusahaan": nama saja, HAPUS "PT.", "CV.", "PD." di depan, Title Case. Contoh: "Fronte Classic Indonesia"
 - "aju": format TANPA tanda hubung, gabung semua. Contoh: "00002301083220260728000115" (dari "000023-010832-20260728-000115")

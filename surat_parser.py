@@ -53,19 +53,56 @@ def _extract_common_fields(text):
     # K: Kode Dokumen
     m = re.search(r'Jenis Dokumen TPB\s*\n?\s*:\s*\n?\s*BC\s*([\d.]+)', text)
     if not m:
-        m = re.search(r'(?:Pembetulan|Pembatalan)\s+(?:Data\s+Dokumen\s+)?BC\s*([\d.]+)', text)
+        # "Pembetulan Data BC 4.0" / "Pembetulan Data Dokumen TPB (BC 2.3)"
+        m = re.search(r'(?:Pembetulan|Pembatalan)\s+(?:Data\s+(?:Dokumen\s+)?)?BC\s*([\d.]+)', text)
+    if not m:
+        # cadangan: baris tabel yang isinya cuma "BC 4.0"
+        m = re.search(r'(?m)^\s*BC\s+([\d.]+)\s*$', text)
     result["kode_dokumen"] = m.group(1) if m else ""
 
     return result
+
+
+def _extract_nomor_aju(text):
+    """Ambil nomor aju — tahan terhadap label bervariasi DAN pemenggalan baris.
+
+    PDF sering memecah nomor aju jadi beberapa baris di dalam satu sel, mis.
+    'No.AJU' -> '071340006432' / '202607170010' / '37' (gabung = 26 digit).
+    Label yang dikenal: 'Nomor Pengajuan', 'No.AJU', 'No AJU', 'AJU'.
+    Return string digit saja ("" kalau tak ketemu).
+    """
+    m = re.search(r'(?:Nomor\s+Pengajuan|No\.?\s*AJU|No\s+AJU|\bAJU)\b',
+                  text, re.IGNORECASE)
+    if not m:
+        return ""
+    rest = text[m.end():]
+    # buang titik dua / spasi / baris kosong di depan nilai
+    rest = rest.lstrip(" \t\r\n:").lstrip()
+    digits = ""
+    for ln in rest.split("\n"):
+        ln = ln.strip()
+        if not ln:
+            continue
+        # lanjut hanya kalau baris murni angka (boleh ada pemisah dash/slash)
+        if re.fullmatch(r'[0-9][0-9\-−–—‐./\s]*', ln):
+            digits += re.sub(r'[^0-9]', '', ln)
+            if len(digits) >= 26:
+                break
+        else:
+            break
+    return digits
 
 
 def _extract_ajo_block(text):
     """Extract one aju's fields from a text block starting at 'Nomor Pengajuan'."""
     result = {}
 
-    # J: Nomor Aju
-    m = re.search(r'Nomor Pengajuan\s*\n?\s*:\s*\n?\s*([0-9\-]+)', text)
-    result["nomor_aju"] = re.sub(r"[\-−–—‐]", "", m.group(1)).strip() if m else ""
+    # J: Nomor Aju — pakai pencari tahan-pemenggalan dulu, baru cadangan regex lama
+    aju = _extract_nomor_aju(text)
+    if not aju:
+        m = re.search(r'(?:Nomor Pengajuan|No\.?\s*AJU|No\s*AJU)\s*\n?\s*:?\s*\n?\s*([0-9\-−–—‐]+)', text)
+        aju = re.sub(r"[^0-9]", "", m.group(1)) if m else ""
+    result["nomor_aju"] = aju
 
     # L, M: Nomor Pendaftaran / Tanggal
     m = re.search(
@@ -82,11 +119,27 @@ def _extract_ajo_block(text):
             result["tanggal_daftar"] = re.sub(r'\s+', ' ', m3.group(1)).strip()
         else:
             result["tanggal_daftar"] = ""
+    # Cadangan template BC 4.0: label "No Pend / Tgl :" → nilai "061027 /" lalu "17-07-2026"
+    if not result.get("nopen"):
+        m4 = re.search(
+            r'No\.?\s*Pend\s*/?\s*Tgl\s*:?\s*\n?\s*(\d+)\s*/\s*\n?\s*(\d{2}-\d{2}-\d{4})',
+            text, re.IGNORECASE)
+        if m4:
+            result["nopen"] = m4.group(1)
+            result["tanggal_daftar"] = m4.group(2)
 
     # Q: Status Dokumen — cover 2 varian: "Status Dokumen : X" atau "Status pada CEISA 4.0 : X"
     # Catatan: harus \n? (bukan \\n?) supaya newline asli dikenali
     m = re.search(r'Status\s+(?:Dokumen|pada\s+CEISA\s*4\.0)\s*\n?\s*:\s*\n?\s*(.+)', text)
     result["status"] = m.group(1).strip() if m else ""
+    # Cadangan template BC 4.0: label "Status Dok", nilainya baris demi baris
+    # ("Selesai" / "Proses" / "(SPPD)") sampai baris angka berikutnya (kolom).
+    if not result["status"] and result.get("tanggal_daftar"):
+        m5 = re.search(
+            re.escape(result["tanggal_daftar"]) + r'\s*\n((?:(?!\n\s*\d+\s*\n).)+)',
+            text, re.DOTALL)
+        if m5:
+            result["status"] = re.sub(r'\s+', ' ', m5.group(1)).strip()
 
     # R: Item Perbaikan — ambil NAMA kolom dari tabel "Elemen data..."
     item_names = []
@@ -246,12 +299,16 @@ def _llm_fallback(text, common, base_results=None):
         else:
             r = dict(common)
 
-        aju = re.sub(r"[\-−–—‐]", "", str(lr.get("aju", "")))
-        if aju:
+        aju = re.sub(r"[^0-9]", "", str(lr.get("aju", "")))
+        # Jangan biarkan aju LLM yang lebih pendek (sering kepotong karena nomor
+        # dipecah beberapa baris) menimpa hasil regex yang sudah lengkap (26 digit).
+        if aju and len(aju) >= len(r.get("nomor_aju", "") or ""):
             r["nomor_aju"] = aju
         for src, dst in MAPPING:
             val = lr.get(src)
-            if val:
+            # isi kalau kosong, atau pakai nilai LLM hanya jika TIDAK lebih pendek
+            # (supaya nilai regex verbatim yang lebih lengkap tidak dipotong LLM)
+            if val and len(str(val)) >= len(str(r.get(dst, "") or "")):
                 r[dst] = val
         normalized.append(r)
     return normalized
