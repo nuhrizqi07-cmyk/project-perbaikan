@@ -60,7 +60,9 @@ ATURAN EKSTRAKSI:
   status bisa berlabel "Status pada CEISA 4.0", "Status Dokumen", "Status Dok", atau "Uraian Proses".
 - "surat": hanya angka setelah "S-" (contoh: "1924" dari "S-1924/KBC.1102/2026")
 - "perusahaan": nama saja, HAPUS "PT.", "CV.", "PD." di depan, Title Case. Contoh: "Fronte Classic Indonesia"
-- "aju": format TANPA tanda hubung, gabung semua. Contoh: "00002301083220260728000115" (dari "000023-010832-20260728-000115")
+- "aju": format TANPA tanda hubung, gabung semua. Nomor aju BISA memuat huruf (kode 3 huruf
+  dari CEISA, mis. "000027COQ95520260930002853") — huruf JANGAN dibuang. Contoh lain:
+  "00002301083220260728000115" (dari "000023-010832-20260728-000115")
 - "nopen": angka saja dari "Nomor Pendaftaran", tanpa spasi
 - "tanggal_surat" / "tanggal_daftar" / "tanggal_permohonan": format asli dari surat (contoh: "10 Agustus 2026" atau "28-07-2026")
 - "item_perbaikan": HANYA NAMA kolom elemen data yang dibetulkan (dari tabel pembetulan), Title Case,

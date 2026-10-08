@@ -69,7 +69,9 @@ def _extract_nomor_aju(text):
     PDF sering memecah nomor aju jadi beberapa baris di dalam satu sel, mis.
     'No.AJU' -> '071340006432' / '202607170010' / '37' (gabung = 26 digit).
     Label yang dikenal: 'Nomor Pengajuan', 'No.AJU', 'No AJU', 'AJU'.
-    Return string digit saja ("" kalau tak ketemu).
+    Nomor aju BISA memuat huruf (kode 3 huruf dari CEISA, mis.
+    '000027COQ95520260930002853'), jadi huruf TIDAK dibuang.
+    Return string alfanumerik ("" kalau tak ketemu).
     """
     m = re.search(r'(?:Nomor\s+Pengajuan|No\.?\s*AJU|No\s+AJU|\bAJU)\b',
                   text, re.IGNORECASE)
@@ -78,19 +80,23 @@ def _extract_nomor_aju(text):
     rest = text[m.end():]
     # buang titik dua / spasi / baris kosong di depan nilai
     rest = rest.lstrip(" \t\r\n:").lstrip()
-    digits = ""
+    alnum = ""
     for ln in rest.split("\n"):
         ln = ln.strip()
         if not ln:
             continue
-        # lanjut hanya kalau baris murni angka (boleh ada pemisah dash/slash)
-        if re.fullmatch(r'[0-9][0-9\-−–—‐./\s]*', ln):
-            digits += re.sub(r'[^0-9]', '', ln)
-            if len(digits) >= 26:
+        # Hentikan kalau muncul titik dua (baris label lain) atau baris tanpa angka
+        # (mis. "Nomor Pendaftaran / Tanggal") supaya label berikutnya tidak terbaca.
+        if ":" in ln or not re.search(r'\d', ln):
+            break
+        # lanjut hanya kalau baris murni alfanumerik (boleh ada pemisah dash/slash/titik)
+        if re.fullmatch(r'[0-9A-Za-z][0-9A-Za-z\-−–—‐./ ]*', ln):
+            alnum += re.sub(r'[^0-9A-Za-z]', '', ln)
+            if len(alnum) >= 26:
                 break
         else:
             break
-    return digits
+    return alnum
 
 
 def _extract_ajo_block(text):
@@ -100,8 +106,8 @@ def _extract_ajo_block(text):
     # J: Nomor Aju — pakai pencari tahan-pemenggalan dulu, baru cadangan regex lama
     aju = _extract_nomor_aju(text)
     if not aju:
-        m = re.search(r'(?:Nomor Pengajuan|No\.?\s*AJU|No\s*AJU)\s*\n?\s*:?\s*\n?\s*([0-9\-−–—‐]+)', text)
-        aju = re.sub(r"[^0-9]", "", m.group(1)) if m else ""
+        m = re.search(r'(?:Nomor Pengajuan|No\.?\s*AJU|No\s*AJU)\s*\n?\s*:?\s*\n?\s*([0-9A-Za-z\-−–—‐]+)', text)
+        aju = re.sub(r"[^0-9A-Za-z]", "", m.group(1)) if m else ""
     result["nomor_aju"] = aju
 
     # L, M: Nomor Pendaftaran / Tanggal
@@ -299,7 +305,7 @@ def _llm_fallback(text, common, base_results=None):
         else:
             r = dict(common)
 
-        aju = re.sub(r"[^0-9]", "", str(lr.get("aju", "")))
+        aju = re.sub(r"[^0-9A-Za-z]", "", str(lr.get("aju", "")))
         # Jangan biarkan aju LLM yang lebih pendek (sering kepotong karena nomor
         # dipecah beberapa baris) menimpa hasil regex yang sudah lengkap (26 digit).
         if aju and len(aju) >= len(r.get("nomor_aju", "") or ""):
