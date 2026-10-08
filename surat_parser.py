@@ -213,6 +213,35 @@ def _nama_kolom_dari_tabel(text):
 
     header = {"no", "kolom", "diberitahukan", "seharusnya", "sebelumnya", "menjadi",
               "terekam", "urut", "data", "no urut", "uraian"}
+    raw_lines = [l.strip() for l in region.split("\n")]
+
+    # ── Layout grid: baris header kolom eksplisit, mis. BC 2.7 "Kolom | Elemen Data |
+    #    No Urut | Terekam | Perbaikan". Nama elemen = isi kolom "Elemen Data", dan tiap baris
+    #    punya tepat N sel → cara paling andal: potong baris jadi grup N, ambil posisi Elemen Data.
+    HSLOTS = {"kolom", "elemen data", "no urut", "terekam", "perbaikan",
+              "diberitahukan", "seharusnya", "sebelumnya", "menjadi"}
+    hidx = None
+    for i in range(len(raw_lines)):
+        run, j = [], i
+        while j < len(raw_lines) and raw_lines[j].lower() in HSLOTS:
+            run.append(raw_lines[j].lower())
+            j += 1
+        if len(run) >= 3:
+            hidx = (i, run)
+            break
+    if (hidx and "elemen data" in hidx[1] and "terekam" in hidx[1]
+            and "perbaikan" in hidx[1]):
+        i0, cols = hidx
+        n, idx = len(cols), cols.index("elemen data")
+        body = [l for l in raw_lines[i0 + n:] if l]
+        names = []
+        for k in range(0, len(body) - n + 1, n):     # tiap grup = satu baris tabel
+            val = body[k + idx]
+            if val and not re.fullmatch(r'[\d\.,\-\s]+', val):
+                names.append(val)
+        if names:
+            return _join_names(names)
+
     nama = []
     for ln in (l.strip() for l in region.split("\n")):
         if not ln or ln.lower() in header:

@@ -74,6 +74,9 @@ ATURAN EKSTRAKSI:
   dulu jadi satu nama utuh sebelum di-Title Case.
   Contoh hasil: "Lembar Ke 3 (Lembar Dokumen Pelengkap Pabean), No Urut Dalam, Tanggal"
   atau "Nilai CIF, Uraian Barang, BM, BMT"
+  Ada template dgn header kolom "Kolom | Elemen Data | No Urut | Terekam | Perbaikan" (muncul setelah
+  judul "Elemen data yang akan dilakukan pembetulan"). Di situ nama yang diambil = isi kolom "Elemen Data"
+  (mis. "Pos Tarif/HS", "Kode Barang", "Uraian"), BUKAN nama header kolomnya.
 - "aplikasi": "CEISA 4.0" atau "CEISA TPB", dari konteks surat
 - "status": dari "Status pada CEISA 4.0", "Status Dokumen", atau "Uraian Proses". Contoh: "Gate In TPB/KEK", "SPPD", "Selesai Proses"
 
